@@ -1,0 +1,4 @@
+so, to verify that testing works run the command
+"sbt 'testOnly gcd.GCDTester -- -z Basic'"
+within the main directory.
+
