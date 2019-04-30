@@ -90,9 +90,7 @@ object SHA256Test {
       (x & y) ^ (x & z) ^ (y & z)
     }
 
-    println(mess.toString(16))
     val mLength = mess.toString(16).length()/128
-    println("blocks " + mLength)
 
     var H1 = BigInt("6a09e667", 16)
     var H2 = BigInt("bb67ae85", 16)
@@ -147,15 +145,6 @@ object SHA256Test {
       H6 = (f + H6) & (BigInt(2).pow(32)-1)
       H7 = (g + H7) & (BigInt(2).pow(32)-1)
       H8 = (h + H8) & (BigInt(2).pow(32)-1)
-
-      print(H1.toString(16) + " ")
-      print(H2.toString(16) + " ")
-      print(H3.toString(16) + " ")
-      print(H4.toString(16) + " ")
-      print(H5.toString(16) + " ")
-      print(H6.toString(16) + " ")
-      print(H7.toString(16) + " ")
-      println(H8.toString(16))
 
     }
 
