@@ -4,3 +4,7 @@ within the main directory.
 
 
 The main test function is fully working to spec and I tested it against an online SHA256 Hasher.
+
+testing takes the form
+sbt 'test:runMain sha256.testMessageScheduler'
+in console.
