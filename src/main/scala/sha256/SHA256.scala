@@ -36,7 +36,7 @@ class compressionFunction(debugTap: Boolean) extends Module{
   val io = IO(new Bundle{
     val messageBlock    = Input(UInt(512.W))
     val start           = Input(Bool())
-//    val initialState    = Input(Vec(8, UInt(32.W)))
+    val initialState    = Input(Vec(8, UInt(32.W)))
     val registerOut     = Output(Vec(8, UInt(32.W)))
     val ready           = Output(Bool())
     val stateTap        = if (debugTap) Some(Output(Vec(8, UInt(32.W)))) else None
@@ -89,16 +89,16 @@ class compressionFunction(debugTap: Boolean) extends Module{
 
       when(io.start){
         state := sLoop
-        registers(0) := "h_6a09e667".U(32.W)  //FIXME, have the correct output WHILE ready = true.
-        registers(1) := "h_bb67ae85".U(32.W)
-        registers(2) := "h_3c6ef372".U(32.W)
-        registers(3) := "h_a54ff53a".U(32.W)
-        registers(4) := "h_510e527f".U(32.W)
-        registers(5) := "h_9b05688c".U(32.W)
-        registers(6) := "h_1f83d9ab".U(32.W)
-        registers(7) := "h_5be0cd19".U(32.W)
+//        registers(0) := "h_6a09e667".U(32.W)  //FIXME, have the correct output WHILE ready = true.
+//        registers(1) := "h_bb67ae85".U(32.W)
+//        registers(2) := "h_3c6ef372".U(32.W)
+//        registers(3) := "h_a54ff53a".U(32.W)
+//        registers(4) := "h_510e527f".U(32.W)
+//        registers(5) := "h_9b05688c".U(32.W)
+//        registers(6) := "h_1f83d9ab".U(32.W)
+//        registers(7) := "h_5be0cd19".U(32.W)
 
-        //registers := io.initialState
+        registers := io.initialState
       }
     }
     is (sLoop){
@@ -121,6 +121,76 @@ class compressionFunction(debugTap: Boolean) extends Module{
       }
     }
   }
+}
+
+
+class hash extends Module{
+  val io = IO(new Bundle{
+    val messageBlock          = Input(UInt(512.W))
+    val blockEndFlag          = Input(Bool())
+    val start                 = Input(Bool())
+    val messageLength         = Input(UInt(64.W))
+    val ready                 = Output(Bool())
+    val finished              = Output(Bool())
+    val outputHash            = Output(Vec(8, UInt(32.W)))
+  })
+
+  //val messageReg = Reg(UInt(512.W))
+  val compressor = Module(new compressionFunction(false))
+  val sReady :: sLoop :: sPrompt :: Nil = Enum(3)
+  val state = RegInit(sReady)
+  val H = Reg(Vec(8,UInt(32.W)))
+  val initialHState = VecInit(Array("h_6a09e667".U, "h_bb67ae85".U, "h_3c6ef372".U, "h_a54ff53a".U, "h_510e527f".U, "h_9b05688c".U, "h_1f83d9ab".U, "h_5be0cd19".U))
+  //val outputReg = RegInit(Vec(Array(0.U(32.W),0.U(32.W),0.U(32.W),0.U(32.W),0.U(32.W),0.U(32.W),0.U(32.W),0.U(32.W))))
+
+  val preprocessor = Module(new preprocessCap)
+  preprocessor.io.blockIn := io.messageBlock
+  preprocessor.io.messageLength := io.messageLength
+
+  //compressor.io.messageBlock := io.messageBlock
+  compressor.io.start := false.B
+  compressor.io.initialState := initialHState
+
+  when(io.blockEndFlag){
+    compressor.io.messageBlock := preprocessor.io.blockOut
+  }.otherwise{
+    compressor.io.messageBlock := io.messageBlock
+  }
+
+  io.finished := state === sReady
+  io.ready := (state === sReady) | (state === sPrompt)
+  io.outputHash := H //H(0)##H(1)##H(2)##H(3)##H(4)##H(5)##H(6)##H(7)
+
+
+  switch(state){
+    is(sReady){
+      when(io.start){
+        H := initialHState
+        compressor.io.initialState := initialHState
+        compressor.io.start := true.B
+        state := sLoop
+      }
+    }
+    is(sLoop){
+      compressor.io.start := true.B
+      when(compressor.io.ready === true.B){
+        when(io.blockEndFlag){
+          state := sReady
+          for (i <- 0 to 7){
+            H(i) := H(i) +% compressor.io.registerOut(i)
+            //outputReg(i) := H(i) +% compressor.io.registerOut(i)
+          }
+        }.otherwise{
+          state := sPrompt
+        }
+      }
+
+    }
+    is(sPrompt){
+      state := sReady
+    }
+  }
+
 }
 
 class preprocessCap extends Module{ //NOTE This works as long as the message in is left aligned.

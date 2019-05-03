@@ -118,7 +118,7 @@ class SHA256Test {
     Array(a,b,c,d,e,f,g,h)
   }
 
-  def hash(mess:BigInt):BigInt = {
+  def hash(mess:BigInt):Array[BigInt] = {
 
 
     val mLength = mess.toString(16).length()/128
@@ -132,14 +132,14 @@ class SHA256Test {
     var H7 = BigInt("1f83d9ab", 16)
     var H8 = BigInt("5be0cd19", 16)
 
-    var a = BigInt(0)
-    var b = BigInt(0)
-    var c = BigInt(0)
-    var d = BigInt(0)
-    var e = BigInt(0)
-    var f = BigInt(0)
-    var g = BigInt(0)
-    var h = BigInt(0)
+//    var a = BigInt(0)
+//    var b = BigInt(0)
+//    var c = BigInt(0)
+//    var d = BigInt(0)
+//    var e = BigInt(0)
+//    var f = BigInt(0)
+//    var g = BigInt(0)
+//    var h = BigInt(0)
 
 
     for(subChunk <- 0 until mLength){
@@ -159,7 +159,7 @@ class SHA256Test {
 
     }
 
-    (H1 << 224) + (H2 << 192) + (H3 << 160) + (H4 << 128) + (H5 << 96) + (H6 << 64) + (H7 << 32) + H8
+    Array(H1, H2, H3, H4, H5, H6, H7, H8)
   }
 
 
@@ -194,7 +194,11 @@ class compressionFunctionTester(dut: compressionFunction) extends PeekPokeTester
   val W = sha.messageSchedule(processed)
   val expectedResult = sha.compress(BigInt("6a09e667",16) ,BigInt("bb67ae85",16) ,BigInt("3c6ef372",16) ,BigInt("a54ff53a",16),BigInt("510e527f",16) ,BigInt("9b05688c",16) ,BigInt("1f83d9ab",16),BigInt("5be0cd19",16), W)
 
-  //poke(dut.io.initialState, VecInit(Array("h_6a09e667".U, "h_bb67ae85".U, "h_3c6ef372".U, "h_a54ff53a".U, "h_510e527f".U, "h_9b05688c".U, "h_1f83d9ab".U, "h_5be0cd19".U)))
+  val initState = Array("h_6a09e667".U, "h_bb67ae85".U, "h_3c6ef372".U, "h_a54ff53a".U, "h_510e527f".U, "h_9b05688c".U, "h_1f83d9ab".U, "h_5be0cd19".U)
+  for(i <- 0 to 7){
+    poke(dut.io.initialState(i), initState(i))
+  }
+
   poke(dut.io.messageBlock, processed.U)
   poke(dut.io.start, true.B)
   step(1)
@@ -235,6 +239,47 @@ class preprocessCapTester(dut: preprocessCap) extends PeekPokeTester(dut){
   expect(result.U, processed.U)
 }
 
+class hashTester(dut: hash) extends PeekPokeTester(dut){
+  val sha = new SHA256Test
+  val processed = sha.preprocess(BigInt("616263", 16))
+  val expected  = sha.hash(processed)
+
+  poke(dut.io.messageBlock, "h_61626300_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000".U(512.W))
+  poke(dut.io.blockEndFlag, true.B)
+  poke(dut.io.start, true.B)
+  poke(dut.io.messageLength,  ("616263".length()*4).U)
+  println("initial.")
+  var ready = peek(dut.io.ready)
+  var finished = peek(dut.io.finished)
+  var output = peek(dut.io.outputHash)
+  println("ready:    " + ready.toString())
+  println("finished: " + finished.toString())
+  //println("output:   " + output.toString(16))
+  println("-----------------")
+  step(1)
+  poke(dut.io.start, false.B)
+  for(i <- 0 to 65){
+//    ready = peek(dut.io.ready)
+//    finished = peek(dut.io.finished)
+    output = peek(dut.io.outputHash)
+//    println("step:     " + i.toString())
+//    println("ready:    " + ready.toString())
+//    println("finished: " + finished.toString())
+//    print(  "output:   "  + output.toString())
+//    for(n <- 0 to 7){
+//      print(output(n).toString(16) + " ")
+//    }
+//    println()
+//    println("-----------------")
+    step(1)
+  }
+  for(n <- 0 to 7){
+    println("Test: " + output(n).toString(16) + " VS " + expected(n).toString(16) + (if(output(n) == expected(n)) " PASSED" else " FAILED"))
+    expect(output(n).U,expected(n).U)
+  }
+  //TODO, it works... add a expect to check the output.
+}
+
 object testMessageScheduler extends App {
   chisel3.iotesters.Driver(() => new messageScheduler()) {
     c => new messageSchedulerTester(c)
@@ -246,6 +291,10 @@ object testMessageScheduler extends App {
 
   chisel3.iotesters.Driver(() => new preprocessCap()){
     c => new preprocessCapTester(c)
+  }
+
+  chisel3.iotesters.Driver(() => new hash()){
+    c => new hashTester(c)
   }
 }
 
