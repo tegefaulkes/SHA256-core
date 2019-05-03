@@ -122,3 +122,15 @@ class compressionFunction(debugTap: Boolean) extends Module{
     }
   }
 }
+
+class preprocessCap extends Module{ //NOTE This works as long as the message in is left aligned.
+  val io = IO(new Bundle{
+    val blockIn       = Input(UInt(512.W))
+    val messageLength = Input(UInt(64.W))
+    val blockOut      = Output(UInt(512.W))
+  })
+  val zeros = 512.U - (io.messageLength % 512.U)
+  val zeroPad = 1.U << (zeros - 1.U)
+  io.blockOut := io.blockIn +% zeroPad.asUInt() +% io.messageLength //FIXME I bet the message block will be right aligned.
+  //find number of zeros
+}

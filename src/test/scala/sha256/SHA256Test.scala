@@ -222,6 +222,19 @@ class compressionFunctionTester(dut: compressionFunction) extends PeekPokeTester
 
 }
 
+class preprocessCapTester(dut: preprocessCap) extends PeekPokeTester(dut){
+  val sha = new SHA256Test
+  val processed = sha.preprocess(BigInt("616263", 16))
+  poke(dut.io.blockIn, "h_61626300_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000".U(512.W))
+  poke(dut.io.messageLength, ("616263".length()*4).U)
+  val result = peek(dut.io.blockOut)
+  println("input:    " + "61626300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+  println("result:   " + result.toString(16))
+  println("Expected: " + processed.toString(16))
+  println("is: " + (result == processed).toString())
+  expect(result.U, processed.U)
+}
+
 object testMessageScheduler extends App {
   chisel3.iotesters.Driver(() => new messageScheduler()) {
     c => new messageSchedulerTester(c)
@@ -229,6 +242,10 @@ object testMessageScheduler extends App {
 
   chisel3.iotesters.Driver(() => new compressionFunction(true)){
     c => new compressionFunctionTester(c)
+  }
+
+  chisel3.iotesters.Driver(() => new preprocessCap()){
+    c => new preprocessCapTester(c)
   }
 }
 
